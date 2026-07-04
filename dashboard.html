@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriSense AI — Crop Advisory</title>
+<style>
+  :root {
+    --green: #16a34a;
+    --green-dark: #0f7d38;
+    --green-bg: #dcfce7;
+    --blue: #2563eb;
+    --blue-bg: #dbeafe;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --ink: #1f2937;
+    --muted: #9ca3af;
+    --field-bg: #f3f4f6;
+    --field-border: #e5e7eb;
+    --card-border: #eceef1;
+    --radius-card: 16px;
+    --radius-field: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #fbfbfa;
+    color: var(--ink);
+    padding: 32px 16px 60px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  header { margin-bottom: 24px; text-align: left; }
+  header .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--green);
+    font-weight: 700;
+  }
+  header h1 { margin: 4px 0 2px; font-size: 26px; color: var(--ink); }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-card);
+    padding: 26px 28px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 19px;
+    font-weight: 800;
+    color: var(--green);
+    letter-spacing: 0.02em;
+    margin-bottom: 22px;
+  }
+  .panel-title svg { flex-shrink: 0; }
+
+  label {
+    display: block;
+    font-size: 14px;
+    color: var(--ink);
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+  .field { margin-bottom: 18px; }
+  .helper {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  select, textarea {
+    width: 100%;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius-field);
+    padding: 13px 14px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--field-bg);
+    color: var(--ink);
+    appearance: none;
+  }
+  textarea { resize: vertical; min-height: 78px; font-weight: 400; }
+  textarea::placeholder { color: #a3a9b3; font-weight: 400; }
+  select:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+
+  button#submitBtn {
+    width: 100%;
+    border: none;
+    background: var(--green);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    padding: 15px;
+    border-radius: var(--radius-field);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(22,163,74,0.25);
+  }
+  button#submitBtn:hover { background: var(--green-dark); }
+  button#submitBtn:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+  button#submitBtn:disabled { background: #a7d8b7; cursor: not-allowed; box-shadow: none; }
+
+  .state { display: none; }
+  .state.active { display: block; }
+
+  #loadingState { display: none; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; padding: 6px 0; }
+  #loadingState.active { display: flex; }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid var(--field-border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .alert-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--red-bg);
+    color: var(--red);
+    border-radius: var(--radius-field);
+    padding: 14px 18px;
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 20px;
+  }
+
+  .section-heading {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0 0 12px;
+  }
+
+  .advisory-block {
+    background: var(--green-bg);
+    border-radius: var(--radius-field);
+    padding: 16px 18px;
+    margin-bottom: 22px;
+  }
+  .advisory-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .advisory-item + .advisory-item { margin-top: 14px; }
+  .advisory-item svg { flex-shrink: 0; margin-top: 2px; }
+  .advisory-item .advisory-label {
+    font-weight: 800;
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--green-dark);
+    margin-bottom: 2px;
+  }
+
+  .irrigation-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--blue-bg);
+    border-radius: var(--radius-field);
+    padding: 16px 18px;
+  }
+  .irrigation-left { display: flex; align-items: center; gap: 12px; }
+  .irrigation-left .irrigation-title { font-size: 16px; font-weight: 800; color: var(--ink); }
+  .irrigation-left .irrigation-sub { font-size: 13px; color: #4b5563; margin-top: 2px; }
+  .irrigation-right { text-align: right; }
+  .irrigation-right .irrigation-best { font-size: 12px; font-weight: 800; color: var(--blue); }
+  .irrigation-right .irrigation-time { font-size: 13px; font-weight: 700; color: var(--ink); margin-top: 2px; }
+
+  #errorState { display: none; color: var(--red); font-size: 15px; font-weight: 700; }
+  #errorState.active { display: block; }
+
+  #emptyState { color: var(--muted); font-size: 14px; }
+
+  .placeholder-note {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 20px;
+    border-top: 1px dashed var(--field-border);
+    padding-top: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Team ASPIRE · AMD Developer Hackathon</div>
+    <h1>AgriSense AI</h1>
+    <p>Crop advisory for Haryana farmers</p>
+  </header>
+
+  <div class="grid">
+    <!-- INPUT PANEL -->
+    <div class="panel">
+      <div class="panel-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21c0-5 4-9 9-9M5 21c0-9 4-16 14-18 1 8-2 15-9 17-2 .6-3.7.7-5 1z"/></svg>
+        FARMER INPUT
+      </div>
+
+      <div class="field">
+        <label for="cropType">Crop type</label>
+        <select id="cropType">
+          <option value="">Select crop</option>
+          <option>Wheat</option>
+          <option>Rice</option>
+          <option>Mustard</option>
+        </select>
+        <div class="helper">Select the crop you are growing</div>
+      </div>
+
+      <div class="field">
+        <label for="district">District</label>
+        <select id="district">
+          <option value="">Select district (Haryana)</option>
+          <option>Karnal</option>
+          <option>Hisar</option>
+          <option>Rohtak</option>
+          <option>Panipat</option>
+        </select>
+        <div class="helper">Select your district</div>
+      </div>
+
+      <div class="field">
+        <label for="question">Your question</label>
+        <textarea id="question" placeholder="e.g. &ldquo;My wheat leaves look yellow, what should I do?&rdquo;"></textarea>
+        <div class="helper">Ask anything about your crop, pests, irrigation, etc.</div>
+      </div>
+
+      <button id="submitBtn">Get advisory</button>
+    </div>
+
+    <!-- OUTPUT PANEL -->
+    <div class="panel">
+      <div class="panel-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V10M12 21V6M18 21v-8"/></svg>
+        APP OUTPUT
+      </div>
+
+      <!-- Loading state -->
+      <div id="loadingState">
+        <div class="spinner"></div>
+        <span>Getting advisory...</span>
+      </div>
+
+      <!-- Result state -->
+      <div id="resultState" class="state">
+        <div id="alertBanner" class="alert-banner" style="display:none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Moisture stress detected
+        </div>
+
+        <div class="section-heading">Advisory</div>
+        <div class="advisory-block" id="advisoryBlock">
+          <div class="advisory-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#16a34a"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div>
+              <span class="advisory-label">Problem</span>
+              <span id="advisoryProblem">Your advisory will appear here.</span>
+            </div>
+          </div>
+          <div class="advisory-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#16a34a"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div>
+              <span class="advisory-label">Immediate action</span>
+              <span id="advisoryAction"></span>
+            </div>
+          </div>
+          <div class="advisory-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#16a34a"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div>
+              <span class="advisory-label">Watch for (next 7 days)</span>
+              <span id="advisoryWatch"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-heading" id="irrigationHeading" style="display:none;">Irrigation suggestion</div>
+        <div class="irrigation-card" id="irrigationCard" style="display:none;">
+          <div class="irrigation-left">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="#3b82f6"><path d="M12 2C9 7 5 11.5 5 15a7 7 0 0 0 14 0c0-3.5-4-8-7-13z"/></svg>
+            <div>
+              <div class="irrigation-title">Irrigate now</div>
+              <div class="irrigation-sub" id="irrigationAmount">Light irrigation</div>
+            </div>
+          </div>
+          <div class="irrigation-right">
+            <div class="irrigation-best">Best time</div>
+            <div class="irrigation-time">Morning preferred</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error state -->
+      <div id="errorState">Something went wrong. Please try again.</div>
+
+      <!-- Empty state (before first submit) -->
+      <div id="emptyState" class="state active">
+        Fill in the form and tap "Get advisory" to see your result.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const submitBtn = document.getElementById('submitBtn');
+  const loadingState = document.getElementById('loadingState');
+  const resultState = document.getElementById('resultState');
+  const errorState = document.getElementById('errorState');
+  const emptyState = document.getElementById('emptyState');
+  const alertBanner = document.getElementById('alertBanner');
+  const advisoryProblem = document.getElementById('advisoryProblem');
+  const advisoryAction = document.getElementById('advisoryAction');
+  const advisoryWatch = document.getElementById('advisoryWatch');
+  const irrigationCard = document.getElementById('irrigationCard');
+  const irrigationHeading = document.getElementById('irrigationHeading');
+  const irrigationAmount = document.getElementById('irrigationAmount');
+
+  function showState(name) {
+    loadingState.classList.remove('active');
+    resultState.classList.remove('active');
+    errorState.classList.remove('active');
+    emptyState.classList.remove('active');
+    if (name === 'loading') loadingState.classList.add('active');
+    if (name === 'result') resultState.classList.add('active');
+    if (name === 'error') errorState.classList.add('active');
+    if (name === 'empty') emptyState.classList.add('active');
+  }
+
+  // Splits agent.py's numbered text block into 3 parts.
+  // Expects: "1. What is the problem: ... 2. What action to take
+  // immediately: ... 3. What to watch for in next 7 days: ..."
+  function parseAdvisory(raw) {
+    const clean = raw.replace(/=== AgriSense AI Advisory ===/i, '').trim();
+    const parts = clean.split(/\d\.\s*What[^:]*:\s*/i).filter(Boolean);
+    return {
+      problem: (parts[0] || '').trim(),
+      action: (parts[1] || '').trim(),
+      watch: (parts[2] || '').trim(),
+    };
+  }
+
+  submitBtn.addEventListener('click', () => {
+    const crop = document.getElementById('cropType').value;
+    const district = document.getElementById('district').value;
+
+    if (!crop || !district) {
+      alert('Please select crop type and district first.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    showState('loading');
+
+    // TODO: replace this setTimeout block with the real fetch() call to
+    // agent.py. The raw text lives at choices[0]['message']['content'] —
+    // pass it straight into parseAdvisory() below.
+    setTimeout(() => {
+      submitBtn.disabled = false;
+
+      // ---- SAMPLE RESPONSE (from Arya's agent.py run, Karnal/wheat) ----
+      const simulateError = false; // flip to true to preview error state
+      const rawResponse =
+        "=== AgriSense AI Advisory ===\n" +
+        "1. What is the problem: Your wheat crop is currently experiencing severe water stress and poor vigor (confirmed by the dry NDWI of -0.2 and low NDVI of 0.3), which is restricting the roots from absorbing essential nutrients and causing the leaves to turn yellow.\n" +
+        "2. What action to take immediately: Apply a light irrigation to your field immediately to relieve the moisture stress without causing water logging, and follow up with a foliar spray of 1% urea solution (1 kg urea in 100 liters of water) to quickly green up the leaves and boost nitrogen levels.\n" +
+        "3. What to watch for in next 7 days: Monitor the crop to see if the yellowing stops and new leaves regain a healthy green color, while closely scouting for aphids and termites, as water-stressed wheat in the Karnal region is highly susceptible to these pests.";
+      // --------------------------------------------------------------------
+
+      if (simulateError) {
+        showState('error');
+        return;
+      }
+
+      const keywords = ['stress', 'irrigat', 'dry'];
+      const hasStress = keywords.some(k => rawResponse.toLowerCase().includes(k));
+
+      const { problem, action, watch } = parseAdvisory(rawResponse);
+      advisoryProblem.textContent = problem;
+      advisoryAction.textContent = action;
+      advisoryWatch.textContent = watch;
+
+      alertBanner.style.display = hasStress ? 'flex' : 'none';
+      irrigationCard.style.display = hasStress ? 'flex' : 'none';
+      irrigationHeading.style.display = hasStress ? 'block' : 'none';
+      irrigationAmount.textContent = 'Light irrigation, avoid water logging';
+
+      showState('result');
+    }, 1200);
+  });
+</script>
+</body>
+</html>
