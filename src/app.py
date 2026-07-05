@@ -16,6 +16,18 @@ headers = {
     "Content-Type": "application/json"
 }
 
+NDVI_MAP = {
+    'Karnal': 0.4, 'Hisar': 0.2, 'Rohtak': 0.35,
+    'Panipat': 0.3, 'Ambala': 0.45, 'Gurgaon': 0.25,
+    'Jind': 0.28, 'Fatehabad': 0.22
+}
+
+NDWI_MAP = {
+    'Karnal': -0.1, 'Hisar': -0.3, 'Rohtak': -0.2,
+    'Panipat': -0.2, 'Ambala': -0.05, 'Gurgaon': -0.35,
+    'Jind': -0.25, 'Fatehabad': -0.32
+}
+
 @app.route('/advisory', methods=['POST'])
 def get_advisory():
     data = request.json
@@ -23,13 +35,16 @@ def get_advisory():
     district = data.get('district')
     question = data.get('question')
 
+    ndvi = NDVI_MAP.get(district, 0.3)
+    ndwi = NDWI_MAP.get(district, -0.2)
+
     prompt = f"""You are an expert agricultural advisor for Indian farmers.
     
 Farmer details:
 - Crop: {crop}
 - District: {district}, Haryana
-- Satellite NDVI value: 0.3 (0-1 scale, below 0.3 means stressed crop)
-- Satellite NDWI value: -0.2 (negative means dry/water stressed)
+- Satellite NDVI value: {ndvi} (0-1 scale, below 0.3 means stressed crop)
+- Satellite NDWI value: {ndwi} (negative means dry/water stressed)
 - Farmer's question: {question}
 
 Give specific advice in exactly 3 bullet points:
