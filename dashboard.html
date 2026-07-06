@@ -217,23 +217,29 @@
       <div class="field">
         <label for="cropType">Crop type</label>
         <select id="cropType">
-          <option value="">Select crop</option>
-          <option>Wheat</option>
-          <option>Rice</option>
-          <option>Mustard</option>
-        </select>
+    <option value="">Select crop</option>
+    <option>Wheat</option>
+    <option>Rice</option>
+    <option>Mustard</option>
+    <option>Sugarcane</option>
+    <option>Cotton</option>
+</select>
         <div class="helper">Select the crop you are growing</div>
       </div>
 
       <div class="field">
         <label for="district">District</label>
         <select id="district">
-          <option value="">Select district (Haryana)</option>
-          <option>Karnal</option>
-          <option>Hisar</option>
-          <option>Rohtak</option>
-          <option>Panipat</option>
-        </select>
+    <option value="">Select district (Haryana)</option>
+    <option>Karnal</option>
+    <option>Hisar</option>
+    <option>Rohtak</option>
+    <option>Panipat</option>
+    <option>Ambala</option>
+    <option>Gurgaon</option>
+    <option>Jind</option>
+    <option>Fatehabad</option>
+</select>
         <div class="helper">Select your district</div>
       </div>
 
@@ -307,6 +313,20 @@
         </div>
       </div>
 
+<button id="resetBtn"
+style="margin-top:18px;
+width:100%;
+padding:12px;
+border:1px solid #e5e7eb;
+background:#fff;
+border-radius:12px;
+font-size:14px;
+font-weight:700;
+cursor:pointer;
+color:#4b5563;">
+Ask another question
+</button>
+
       <!-- Error state -->
       <div id="errorState">Something went wrong. Please try again.</div>
 
@@ -347,64 +367,78 @@
   // Splits agent.py's numbered text block into 3 parts.
   // Expects: "1. What is the problem: ... 2. What action to take
   // immediately: ... 3. What to watch for in next 7 days: ..."
+
   function parseAdvisory(raw) {
-    const clean = raw.replace(/=== AgriSense AI Advisory ===/i, '').trim();
-    const parts = clean.split(/\d\.\s*What[^:]*:\s*/i).filter(Boolean);
-    return {
-      problem: (parts[0] || '').trim(),
-      action: (parts[1] || '').trim(),
-      watch: (parts[2] || '').trim(),
-    };
+  const clean = raw.replace(/=== AgriSense AI Advisory ===/i, '').trim();
+  const parts = clean.split(/\d\.\s*What[^:]*:\s*/i).filter(Boolean);
+
+  return {
+    problem: (parts[0] || '').trim(),
+    action: (parts[1] || '').trim(),
+    watch: (parts[2] || '').trim(),
+  };
+}
+
+  submitBtn.addEventListener('click', async () => {
+  const crop = document.getElementById('cropType').value;
+  const district = document.getElementById('district').value;
+  const question = document.getElementById('question').value;
+
+  if (!crop || !district) {
+    alert('Please select crop type and district first.');
+    return;
   }
 
-  submitBtn.addEventListener('click', () => {
-    const crop = document.getElementById('cropType').value;
-    const district = document.getElementById('district').value;
+  submitBtn.disabled = true;
+  showState('loading');
 
-    if (!crop || !district) {
-      alert('Please select crop type and district first.');
-      return;
-    }
+  try {
+    const response = await fetch('http://127.0.0.1:5000/advisory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ crop, district, question })
+    });
 
-    submitBtn.disabled = true;
-    showState('loading');
+    const data = await response.json();
+    const rawResponse = data.advisory;
 
-    // TODO: replace this setTimeout block with the real fetch() call to
-    // agent.py. The raw text lives at choices[0]['message']['content'] —
-    // pass it straight into parseAdvisory() below.
-    setTimeout(() => {
-      submitBtn.disabled = false;
+    const keywords = ['stress', 'irrigat', 'dry'];
+    const hasStress = keywords.some(k => rawResponse.toLowerCase().includes(k));
 
-      // ---- SAMPLE RESPONSE (from Arya's agent.py run, Karnal/wheat) ----
-      const simulateError = false; // flip to true to preview error state
-      const rawResponse =
-        "=== AgriSense AI Advisory ===\n" +
-        "1. What is the problem: Your wheat crop is currently experiencing severe water stress and poor vigor (confirmed by the dry NDWI of -0.2 and low NDVI of 0.3), which is restricting the roots from absorbing essential nutrients and causing the leaves to turn yellow.\n" +
-        "2. What action to take immediately: Apply a light irrigation to your field immediately to relieve the moisture stress without causing water logging, and follow up with a foliar spray of 1% urea solution (1 kg urea in 100 liters of water) to quickly green up the leaves and boost nitrogen levels.\n" +
-        "3. What to watch for in next 7 days: Monitor the crop to see if the yellowing stops and new leaves regain a healthy green color, while closely scouting for aphids and termites, as water-stressed wheat in the Karnal region is highly susceptible to these pests.";
-      // --------------------------------------------------------------------
+    const { problem, action, watch } = parseAdvisory(rawResponse);
+    advisoryProblem.textContent = problem;
+    advisoryAction.textContent = action;
+    advisoryWatch.textContent = watch;
 
-      if (simulateError) {
-        showState('error');
-        return;
-      }
+    alertBanner.style.display = hasStress ? 'flex' : 'none';
+    irrigationCard.style.display = hasStress ? 'flex' : 'none';
+    irrigationHeading.style.display = hasStress ? 'block' : 'none';
+    irrigationAmount.textContent = 'Light irrigation, avoid water logging';
 
-      const keywords = ['stress', 'irrigat', 'dry'];
-      const hasStress = keywords.some(k => rawResponse.toLowerCase().includes(k));
+    showState('result');
+  } catch (err) {
+    showState('error');
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
 
-      const { problem, action, watch } = parseAdvisory(rawResponse);
-      advisoryProblem.textContent = problem;
-      advisoryAction.textContent = action;
-      advisoryWatch.textContent = watch;
+    document.getElementById('cropType').value = "";
+    document.getElementById('district').value = "";
+    document.getElementById('question').value = "";
 
-      alertBanner.style.display = hasStress ? 'flex' : 'none';
-      irrigationCard.style.display = hasStress ? 'flex' : 'none';
-      irrigationHeading.style.display = hasStress ? 'block' : 'none';
-      irrigationAmount.textContent = 'Light irrigation, avoid water logging';
+    alertBanner.style.display = "none";
+    irrigationCard.style.display = "none";
+    irrigationHeading.style.display = "none";
 
-      showState('result');
-    }, 1200);
-  });
+    advisoryProblem.textContent = "";
+    advisoryAction.textContent = "";
+    advisoryWatch.textContent = "";
+
+    showState('empty');
+
+});
 </script>
 </body>
 </html>
