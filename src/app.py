@@ -42,15 +42,18 @@ def get_moisture_status(ndwi):
         return "ADEQUATE - no immediate action needed"
 
 def get_weather(district):
-    weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={district},Haryana,IN&appid={weather_api_key}&units=metric"
-    response = requests.get(weather_url)
-    data = response.json()
-    if response.status_code == 200:
-        temp = data['main']['temp']
-        humidity = data['main']['humidity']
-        rain = "rain expected" if 'rain' in data else "no rain expected"
-        return f"Temperature: {temp}°C, Humidity: {humidity}%, {rain}"
-    else:
+    try:
+        weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={district},Haryana,IN&appid={weather_api_key}&units=metric"
+        response = requests.get(weather_url, timeout=10)
+        data = response.json()
+        if response.status_code == 200:
+            temp = data['main']['temp']
+            humidity = data['main']['humidity']
+            rain = "rain expected" if 'rain' in data else "no rain expected"
+            return f"Temperature: {temp}°C, Humidity: {humidity}%, {rain}"
+        else:
+            return "Weather data unavailable"
+    except Exception:
         return "Weather data unavailable"
 
 def extract_json(raw_text):
@@ -62,7 +65,7 @@ def extract_json(raw_text):
         text = match.group(0)
     try:
         return json.loads(text)
-    except:
+    except Exception:
         return None
 
 @app.route('/advisory', methods=['POST'])
@@ -96,9 +99,16 @@ Respond with ONLY a valid JSON object, nothing else before or after. No markdown
         "max_tokens": 1200
     }
 
-    response = requests.post(url, headers=headers, json=payload)
-    result = response.json()
-    raw_advisory = result['choices'][0]['message']['content']
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        response.raise_for_status()
+        result = response.json()
+        raw_advisory = result['choices'][0]['message']['content']
+    except Exception as e:
+        return jsonify({
+            "advisory": "Advisory service is temporarily unavailable. Please try again in a moment.",
+            "error": str(e)
+        }), 200
 
     parsed = extract_json(raw_advisory)
 
@@ -111,4 +121,4 @@ Respond with ONLY a valid JSON object, nothing else before or after. No markdown
     return jsonify({"advisory": advisory})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5050)

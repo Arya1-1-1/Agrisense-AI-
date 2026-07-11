@@ -393,7 +393,7 @@ Ask another question
   showState('loading');
 
   try {
-    const response = await fetch('http://127.0.0.1:5000/advisory', {
+    const response = await fetch('http://127.0.0.1:5050/advisory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ crop, district, question })
