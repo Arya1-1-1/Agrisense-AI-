@@ -1,4 +1,6 @@
 import os
+import re
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -6,6 +8,7 @@ import requests
 
 load_dotenv()
 api_key = os.getenv("FIREWORKS_API_KEY")
+weather_api_key = os.getenv("OPENWEATHER_API_KEY")
 
 app = Flask(__name__)
 CORS(app)
@@ -28,6 +31,40 @@ NDWI_MAP = {
     'Jind': -0.25, 'Fatehabad': -0.32
 }
 
+def get_moisture_status(ndwi):
+    if ndwi < -0.1:
+        return "SEVERELY DRY - irrigate immediately"
+    elif ndwi < 0.1:
+        return "DRY - irrigation needed soon"
+    elif ndwi < 0.3:
+        return "MODERATE - monitor closely"
+    else:
+        return "ADEQUATE - no immediate action needed"
+
+def get_weather(district):
+    weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={district},Haryana,IN&appid={weather_api_key}&units=metric"
+    response = requests.get(weather_url)
+    data = response.json()
+    if response.status_code == 200:
+        temp = data['main']['temp']
+        humidity = data['main']['humidity']
+        rain = "rain expected" if 'rain' in data else "no rain expected"
+        return f"Temperature: {temp}°C, Humidity: {humidity}%, {rain}"
+    else:
+        return "Weather data unavailable"
+
+def extract_json(raw_text):
+    # Strip markdown code fences if present
+    text = re.sub(r'```json|```', '', raw_text).strip()
+    # Find the first {...} block in case there's extra text around it
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        text = match.group(0)
+    try:
+        return json.loads(text)
+    except:
+        return None
+
 @app.route('/advisory', methods=['POST'])
 def get_advisory():
     data = request.json
@@ -39,27 +76,38 @@ def get_advisory():
     ndwi = NDWI_MAP.get(district, -0.2)
 
     prompt = f"""You are an expert agricultural advisor for Indian farmers.
-    
+
 Farmer details:
 - Crop: {crop}
 - District: {district}, Haryana
 - Satellite NDVI value: {ndvi} (0-1 scale, below 0.3 means stressed crop)
-- Satellite NDWI value: {ndwi} (negative means dry/water stressed)
+- Satellite NDWI value: {ndwi}
+- Moisture status: {get_moisture_status(ndwi)}
+- Current weather: {get_weather(district)}
 - Farmer's question: {question}
 
-Give specific advice in exactly 3 bullet points:
-1. What is the problem
-2. What action to take immediately
-3. What to watch for in next 7 days"""
+Respond with ONLY a valid JSON object, nothing else before or after. No markdown, no code fences, no explanation. Use exactly this structure:
+
+{{"problem": "one sentence describing the problem", "action": "one sentence describing immediate action to take", "watch": "one sentence describing what to watch for in the next 7 days"}}"""
 
     payload = {
         "model": "accounts/fireworks/models/glm-5p2",
-        "messages": [{"role": "user", "content": prompt}]
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1200
     }
 
     response = requests.post(url, headers=headers, json=payload)
     result = response.json()
-    advisory = result['choices'][0]['message']['content']
+    raw_advisory = result['choices'][0]['message']['content']
+
+    parsed = extract_json(raw_advisory)
+
+    if parsed and 'problem' in parsed and 'action' in parsed and 'watch' in parsed:
+        advisory = f"1. What is the problem: {parsed['problem']}\n2. What action to take immediately: {parsed['action']}\n3. What to watch for in next 7 days: {parsed['watch']}"
+    else:
+        # fallback - just clean up whatever text came back
+        advisory = raw_advisory.replace('**', '').replace('*', '').replace('•', '').strip()
+
     return jsonify({"advisory": advisory})
 
 if __name__ == '__main__':
