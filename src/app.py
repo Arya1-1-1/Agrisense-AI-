@@ -74,7 +74,8 @@ def get_advisory():
     crop = data.get('crop')
     district = data.get('district')
     question = data.get('question')
-
+    if not question or not question.strip():
+       return jsonify({"advisory": "1. What is the problem: Please enter a question about your crop.\n2. What action to take immediately: Type your question in the box above.\n3. What to watch for in next 7 days: N/A"}), 200
     ndvi = NDVI_MAP.get(district, 0.3)
     ndwi = NDWI_MAP.get(district, -0.2)
 
